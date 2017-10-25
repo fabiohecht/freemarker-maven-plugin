@@ -18,6 +18,7 @@ package de.fenvariel.mavenfreemarker;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import freemarker.cache.FileTemplateLoader;
+import freemarker.log.Logger;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import java.io.File;
@@ -39,8 +40,7 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
 @Mojo(name = "process-ftl")
-public class FreemarkerPlugin
-        extends AbstractMojo {
+public class FreemarkerPlugin extends AbstractMojo {
 
     @Parameter
     private File templateDir;
@@ -50,6 +50,7 @@ public class FreemarkerPlugin
 
     @Parameter
     private TemplateConfiguration[] templateConfigurations = new TemplateConfiguration[0];
+    private Logger log = Logger.getLogger(FreemarkerPlugin.class.getName());
 
     private Configuration getFreemarker(Version version) throws MojoExecutionException {
         Configuration configuration = new Configuration(version.freemarkerVersion);
@@ -61,8 +62,7 @@ public class FreemarkerPlugin
         return configuration;
     }
 
-    public void execute()
-            throws MojoExecutionException {
+    public void execute() throws MojoExecutionException {
 
         for (TemplateConfiguration config : templateConfigurations) {
             generate(config);
@@ -103,9 +103,15 @@ public class FreemarkerPlugin
         }
         File outputDir = config.getOutputDir();
         if (!outputDir.exists()) {
+            System.out.println("creating output dir " + outputDir);
             outputDir.mkdirs();
         }
+
+        System.out.println("# SourceBundles = " + config.getSourceBundles().length);
+
         for (SourceBundle source : config.getSourceBundles()) {
+            System.out.println("process SourceBundle = " + source.toString());
+
             Collection<File> sourceFiles;
             try {
                 sourceFiles = source.getSourceFiles(baseDir);
@@ -116,17 +122,19 @@ public class FreemarkerPlugin
                 throw new MojoExecutionException("no source files found for bundle");
             }
             for (File sourceFile : sourceFiles) {
+                System.out.println("processing source file = " + sourceFile.getName());
+
                 String destinationFilename = config.getPrefix() + getNameWithoutExtension(sourceFile) + config.getSuffix();
                 Path destinationFilePath = Paths.get(outputDir.getAbsolutePath(), destinationFilename + config.getTargetExtension());
                 File destinationFile = destinationFilePath.toFile();
-                Map<String, Object> root = new HashMap<String, Object>();
-                root.put("data", readJson(sourceFile));
-                root.put("additionalData", source.getAdditionalData());
+                Map<String, Object> data = new HashMap<>();
+                data.put("data", sourceFile);
+                data.put("additionalData", source.getAdditionalData());
                 Map<String, Object> configMap = getConfig(config);
                 configMap.put("destinationFilePath", destinationFilePath);
                 configMap.put("destinationFilename", destinationFilename);
-                root.put("config", configMap);
-                generate(template, destinationFile, root, config.getEditableSectionNames());
+                data.put("config", configMap);
+                generate(template, destinationFile, data, config.getEditableSectionNames());
             }
         }
     }
@@ -150,6 +158,8 @@ public class FreemarkerPlugin
 
             Writer writer = new FileWriter(file);
             try {
+                System.out.println("really processing file = " + data.toString());
+
                 template.process(data, writer);
                 writer.flush();
                 System.out.println("Written " + file.getCanonicalPath());

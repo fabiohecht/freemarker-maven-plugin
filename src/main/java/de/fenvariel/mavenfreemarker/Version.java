@@ -24,7 +24,8 @@ public enum Version {
     VERSION_2_3_20(Configuration.VERSION_2_3_20),
     VERSION_2_3_21(Configuration.VERSION_2_3_21),
     VERSION_2_3_22(Configuration.VERSION_2_3_22),
-    VERSION_2_3_23(Configuration.VERSION_2_3_23);
+    VERSION_2_3_23(Configuration.VERSION_2_3_23),
+    VERSION_2_3_26(Configuration.VERSION_2_3_26);
 
     public final freemarker.template.Version freemarkerVersion;
 
