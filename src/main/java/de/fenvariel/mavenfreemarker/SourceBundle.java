@@ -31,10 +31,14 @@ public class SourceBundle {
     private Map<String, Object> additionalData = new HashMap<String, Object>();
 
     public Collection<File> getSourceFiles(File basedir) throws IOException {
+
         System.out.println("baseDir: " + basedir.getAbsolutePath());
+
         FileSystem fs = FileSystems.getDefault();
-        PathMatcher matcher = fs.getPathMatcher("glob:" + files);
-        System.out.println("matcher: " + "\"glob:" + files + "\"");
+        PathMatcher matcher = fs.getPathMatcher(files);
+
+        System.out.println("matcher: " + "\"" + files + "\"");
+
         FindAllFileVisitor visitor = new FindAllFileVisitor(matcher);
         Files.walkFileTree(basedir.toPath(), visitor);
         return visitor.getFiles();
