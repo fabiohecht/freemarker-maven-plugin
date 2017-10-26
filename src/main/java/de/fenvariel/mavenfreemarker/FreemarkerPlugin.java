@@ -179,6 +179,8 @@ public class FreemarkerPlugin extends AbstractMojo {
         configMap.put("destinationFilePath", destinationFilePath);
         configMap.put("destinationFilename", destinationFilename);
         data.put("config", configMap);
+
+        data.put("base64Encode", new Base64Encoder());
         generate(template, destinationFile, data);
     }
 

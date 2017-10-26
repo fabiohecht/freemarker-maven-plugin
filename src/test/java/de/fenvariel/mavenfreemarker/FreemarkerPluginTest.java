@@ -18,10 +18,10 @@ public class FreemarkerPluginTest extends FreemarkerPlugin {
         setTemplateDir(new File("src/test/resources/template"));
         setFtlTemplate("hello_world.xml.ftl");
         setOutputDir(new File("src/test/resources"));
-        PropertiesFile sourceBundle = new PropertiesFile();
+        PropertiesFile propertiesFile = new PropertiesFile();
         setBaseDir(new File("src/test/resources/properties"));
-        sourceBundle.setFiles("glob:**/hello_world.properties");
-        setPropertiesFiles(new PropertiesFile[]{sourceBundle});
+        propertiesFile.setFiles("glob:**/hello_world.properties");
+        setPropertiesFiles(new PropertiesFile[]{propertiesFile});
 
         super.execute();
     }

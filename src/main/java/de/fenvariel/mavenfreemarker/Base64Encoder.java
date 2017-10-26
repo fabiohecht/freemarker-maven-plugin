@@ -11,12 +11,16 @@ import java.util.List;
  */
 public class Base64Encoder implements TemplateMethodModelEx {
 
-    private String base64Encode(byte[] s) {
+    static private String base64Encode(String s) {
+        return base64Encode(s.getBytes(Charset.forName("UTF-8")));
+    }
+
+    static private String base64Encode(byte[] s) {
         return Base64.getEncoder().encodeToString(s);
     }
 
     @Override
     public Object exec(List arguments) throws TemplateModelException {
-        return base64Encode(arguments.get(0).toString().getBytes(Charset.forName("UTF-8")));
+        return base64Encode(arguments.get(0).toString());
     }
 }
