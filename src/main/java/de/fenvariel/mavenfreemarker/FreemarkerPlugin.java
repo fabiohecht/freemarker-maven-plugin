@@ -18,7 +18,6 @@ package de.fenvariel.mavenfreemarker;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import freemarker.cache.FileTemplateLoader;
-import freemarker.cache.FirstMatchTemplateConfigurationFactory;
 import freemarker.core.XMLOutputFormat;
 import freemarker.log.Logger;
 import freemarker.template.Configuration;
@@ -32,7 +31,6 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -44,14 +42,35 @@ import org.apache.maven.plugins.annotations.Parameter;
 @Mojo(name = "process-ftl")
 public class FreemarkerPlugin extends AbstractMojo {
 
-    @Parameter
-    private File templateDir;
-
     @Parameter(defaultValue = "${basedir}", readonly = true)
     private File baseDir;
 
+    @Parameter
+    private File templateDir;
+    @Parameter
+    private String ftlTemplate = null;
+    @Parameter
+    private String targetExtension = "";
+    @Parameter
+    private String prefix = "";
+    @Parameter
+    private String suffix = "";
+    @Parameter
+    private File outputDir;
+    @Parameter
+    private Version version;  
+    @Parameter
+    private PropertiesFile[] propertiesFiles;
+
+    private Logger log = Logger.getLogger(FreemarkerPlugin.class.getName());
+
     private Configuration fmConfiguration;
 
+    @Override
+    public void execute() throws MojoExecutionException {
+        generate();
+    }
+    
     public File getTemplateDir() {
         return templateDir;
     }
@@ -67,19 +86,7 @@ public class FreemarkerPlugin extends AbstractMojo {
     public void setBaseDir(File baseDir) {
         this.baseDir = baseDir;
     }
-
-    public TemplateConfiguration[] getTemplateConfigurations() {
-        return templateConfigurations;
-    }
-
-    public void setTemplateConfigurations(TemplateConfiguration[] templateConfigurations) {
-        this.templateConfigurations = templateConfigurations;
-    }
-
-    @Parameter
-    private TemplateConfiguration[] templateConfigurations = new TemplateConfiguration[0];
-    private Logger log = Logger.getLogger(FreemarkerPlugin.class.getName());
-
+    
     private Configuration getFreemarker(Version version) throws MojoExecutionException {
         Configuration configuration = new Configuration(version.freemarkerVersion);
         try {
@@ -90,17 +97,16 @@ public class FreemarkerPlugin extends AbstractMojo {
         return configuration;
     }
 
-    public void execute() throws MojoExecutionException {
-        for (TemplateConfiguration config : templateConfigurations) {
-            generate(config);
-        }
-    }
-
     private String getNameWithoutExtension(File file) {
         if (file.isDirectory()) {
             return file.getName();
         }
         String filename = file.getName();
+
+        return getNameWithoutExtension(filename);
+    }
+
+    private String getNameWithoutExtension(String filename) {
         int idx = filename.lastIndexOf('.');
         if (idx > 0) {
             return filename.substring(0, idx);
@@ -109,70 +115,71 @@ public class FreemarkerPlugin extends AbstractMojo {
         }
     }
 
-    public Map<String, Object> getConfig(TemplateConfiguration config) {
+    public Map<String, Object> getConfig() {
         Map<String, Object> configMap = new HashMap<>();
-        configMap.put("editableSectionNames", config.getEditableSectionNames().keySet());
-        configMap.put("ftlTemplate", config.getFtlTemplate());
-        configMap.put("outputDir", config.getOutputDir().toString());
-        configMap.put("prefix", config.getPrefix());
-        configMap.put("suffix", config.getSuffix());
-        configMap.put("targetExtension", config.getTargetExtension());
-        configMap.put("version", config.getVersion());
+        configMap.put("ftlTemplate", getFtlTemplate());
+        configMap.put("outputDir", getOutputDir().toString());
+        configMap.put("prefix", getPrefix());
+        configMap.put("suffix", getSuffix());
+        configMap.put("targetExtension", getTargetExtension());
+        configMap.put("version", getVersion());
         return configMap;
     }
 
-    private void generate(TemplateConfiguration config) throws MojoExecutionException {
+    private void generate() throws MojoExecutionException {
 
-        fmConfiguration = getFreemarker(config.getVersion());
+        fmConfiguration = getFreemarker(getVersion());
         fmConfiguration.setOutputFormat(XMLOutputFormat.INSTANCE);
 
         Template template;
         try {
-            template = fmConfiguration.getTemplate(config.getFtlTemplate(), "UTF-8");
+            template = fmConfiguration.getTemplate(getFtlTemplate(), "UTF-8");
         } catch (Exception ex) {
-            throw new MojoExecutionException("error reading template-file " + config.getFtlTemplate(), ex);
+            throw new MojoExecutionException("error reading template-file " + getFtlTemplate(), ex);
         }
 
-        File outputDir = config.getOutputDir();
+        File outputDir = getOutputDir();
         if (!outputDir.exists()) {
             System.out.println("creating output dir " + outputDir);
             outputDir.mkdirs();
         }
 
-        System.out.println("# SourceBundles = " + config.getSourceBundles().length);
+        Properties data = new Properties();
 
-        for (SourceBundle source : config.getSourceBundles()) {
-            System.out.println("process SourceBundle = " + source.toString());
+        for (PropertiesFile propertiesFile : propertiesFiles) {
+
+            System.out.println("process PropertiesFile = " + propertiesFile.toString());
 
             Collection<File> sourceFiles;
             try {
-                sourceFiles = source.getSourceFiles(baseDir);
+                sourceFiles = propertiesFile.getPropertiesFiles(baseDir);
             } catch (IOException ex) {
                 throw new MojoExecutionException("error reading source files", ex);
             }
             if (sourceFiles == null || sourceFiles.isEmpty()) {
                 throw new MojoExecutionException("no source files found for bundle");
             }
-            for (File sourceFile : sourceFiles) {
-                System.out.println("processing source file = " + sourceFile.getName());
+            for (File file : sourceFiles) {
+                System.out.println("processing source file = " + file.getName());
 
-                String destinationFilename = config.getPrefix() + getNameWithoutExtension(sourceFile) + config.getSuffix();
-                Path destinationFilePath = Paths.get(outputDir.getAbsolutePath(), destinationFilename + config.getTargetExtension());
-                File destinationFile = destinationFilePath.toFile();
-                Properties data;
                 try {
-                    data = loadProperties(sourceFile.getCanonicalPath());
+                    data.putAll(loadProperties(file.getCanonicalPath()));
                 } catch (IOException e) {
-                    throw new MojoExecutionException("Properties file '" + sourceFile + "' cannot be loaded: " + e.getMessage(), e);
+                    throw new MojoExecutionException("PropertiesFile file '" + propertiesFile + "' cannot be loaded: " + e.getMessage(), e);
                 }
-                data.put("additionalData", source.getAdditionalData());
-                Map<String, Object> configMap = getConfig(config);
-                configMap.put("destinationFilePath", destinationFilePath);
-                configMap.put("destinationFilename", destinationFilename);
-                data.put("config", configMap);
-                generate(template, destinationFile, data, config.getEditableSectionNames());
             }
+
         }
+
+        String destinationFilename = getPrefix() + getNameWithoutExtension(getFtlTemplate()) + getSuffix();
+        Path destinationFilePath = Paths.get(outputDir.getAbsolutePath(), destinationFilename + getTargetExtension());
+        File destinationFile = destinationFilePath.toFile();
+
+        Map<String, Object> configMap = getConfig();
+        configMap.put("destinationFilePath", destinationFilePath);
+        configMap.put("destinationFilename", destinationFilename);
+        data.put("config", configMap);
+        generate(template, destinationFile, data);
     }
 
     private Map<String, Object> readJson(File source) throws MojoExecutionException {
@@ -185,7 +192,7 @@ public class FreemarkerPlugin extends AbstractMojo {
         }
     }
 
-    private void generate(Template template, File file, Properties data, Map<String, Pattern> keepPatterns) throws MojoExecutionException {
+    private void generate(Template template, File file, Properties data) throws MojoExecutionException {
         try {
 
             file.getParentFile().mkdirs();
@@ -268,5 +275,76 @@ public class FreemarkerPlugin extends AbstractMojo {
                 }
             }
         }
+    }
+
+    public String getFtlTemplate() {
+        return ftlTemplate;
+    }
+
+    public Version getVersion() {
+        return version;
+    }
+
+    public void setVersion(Version version) {
+        this.version = version;
+    }
+
+    public File getOutputDir() {
+        return outputDir;
+    }
+
+    public void setOutputDir(File outputDir) {
+        this.outputDir = outputDir;
+    }
+
+    public String getTargetExtension() {
+        return targetExtension;
+    }
+
+    public String getPrefix() {
+        return prefix;
+    }
+
+    public void setPrefix(String prefix) {
+        this.prefix = prefix;
+    }
+
+    public String getSuffix() {
+        return suffix;
+    }
+
+    public void setSuffix(String suffix) {
+        this.suffix = suffix;
+    }
+
+    public void setTargetExtension(String targetExtension) {
+        if (targetExtension == null || targetExtension.trim().isEmpty()) {
+            this.targetExtension = "";
+        } else {
+            targetExtension = targetExtension.trim();
+            if (targetExtension.charAt(0) != '.') {
+                targetExtension = "." + targetExtension;
+            }
+            this.targetExtension = targetExtension;
+        }
+
+    }
+
+    public void setFtlTemplate(String ftlTemplate) {
+        this.ftlTemplate = ftlTemplate;
+    }
+
+    private Pattern compilePattern(String sectionName) {
+        int flags = Pattern.DOTALL | Pattern.MULTILINE;
+        return Pattern.compile(".*^\\s*?//\\s*?EDITABLE SECTION " + sectionName + ".*?\n(.*?)^\\s*// EDITABLE SECTION " + sectionName
+                + " END.*?\n", flags);
+    }
+
+    public PropertiesFile[] getPropertiesFiles() {
+        return propertiesFiles;
+    }
+
+    public void setPropertiesFiles(PropertiesFile[] propertiesFiles) {
+        this.propertiesFiles = propertiesFiles;
     }
 }

@@ -5,7 +5,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.File;
-import java.util.Properties;
 
 /**
  * Created by fabio on 10/26/17.
@@ -14,24 +13,22 @@ public class FreemarkerPluginTest extends FreemarkerPlugin {
 
     @Test
     public void testGeneration() throws MojoExecutionException {
-        TemplateConfiguration pluginConfiguration = new TemplateConfiguration();
 
-        pluginConfiguration.setVersion(Version.VERSION_2_3_26);
+        setVersion(Version.VERSION_2_3_26);
         setTemplateDir(new File("src/test/resources/template"));
-        pluginConfiguration.setFtlTemplate("hello_world.xml.ftl");
-        pluginConfiguration.setOutputDir(new File("src/test/resources"));
-        SourceBundle sourceBundle = new SourceBundle();
+        setFtlTemplate("hello_world.xml.ftl");
+        setOutputDir(new File("src/test/resources"));
+        PropertiesFile sourceBundle = new PropertiesFile();
         setBaseDir(new File("src/test/resources/properties"));
         sourceBundle.setFiles("glob:**/hello_world.properties");
-        pluginConfiguration.setSourceBundles(new SourceBundle[]{sourceBundle});
+        setPropertiesFiles(new PropertiesFile[]{sourceBundle});
 
-        setTemplateConfigurations(new TemplateConfiguration[]{pluginConfiguration});
         super.execute();
     }
 
     @Test
     public void escapePlaceholdersTest() {
-        Properties properties = new Properties();
+        java.util.Properties properties = new java.util.Properties();
         String text = "abc ${abc} def ${env_dev} ghi ${build_ghi} jkl ${jkl}";
 
         escapePlaceholders(text, properties);

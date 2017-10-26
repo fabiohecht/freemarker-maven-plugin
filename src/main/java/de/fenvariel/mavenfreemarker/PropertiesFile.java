@@ -25,12 +25,11 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-public class SourceBundle {
+public class PropertiesFile {
 
     private String files;
-    private Map<String, Object> additionalData = new HashMap<String, Object>();
 
-    public Collection<File> getSourceFiles(File basedir) throws IOException {
+    public Collection<File> getPropertiesFiles(File basedir) throws IOException {
 
         System.out.println("baseDir: " + basedir.getAbsolutePath());
 
@@ -46,14 +45,6 @@ public class SourceBundle {
 
     public void setFiles(String files) {
         this.files = files;
-    }
-
-    public Map<String, Object> getAdditionalData() {
-        return additionalData;
-    }
-
-    public void setAdditionalData(Map<String, Object> additionalData) {
-        this.additionalData = additionalData;
     }
 
 }
