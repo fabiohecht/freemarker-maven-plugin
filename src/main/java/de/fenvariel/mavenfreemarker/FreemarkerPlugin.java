@@ -33,10 +33,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -236,6 +233,12 @@ public class FreemarkerPlugin extends AbstractMojo {
 
     private void generate(Template template, Writer writer, Properties data) throws MojoExecutionException {
 
+        try {
+            processIncludes(data);
+        } catch (IOException e) {
+            throw new MojoExecutionException("Including file in properties failed: " + e.getMessage(), e);
+        }
+
         escapePlaceholders(new File(getTemplateDir(), getFtlTemplate()), data);
 
         System.out.println("using config = " + data.toString());
@@ -285,14 +288,27 @@ public class FreemarkerPlugin extends AbstractMojo {
         }
     }
 
-
     void escapePlaceholders(String templateContents, Properties properties) {
-        Pattern pattern = Pattern.compile("\\$\\{((?!build_|env_)[^\\}]+)\\}");
+        Pattern pattern = Pattern.compile("\\$\\{((?!build_|env_)[^}]+)}");
         Matcher matcher = pattern.matcher(templateContents);
 
         while (matcher.find()) {
             String var = matcher.group(1);
             properties.put(var, "${" + var + "}");
+        }
+    }
+
+    void processIncludes(Hashtable<Object,Object> properties) throws IOException {
+        Pattern pattern = Pattern.compile("file\\(([^)]+)\\)");
+
+        for (Map.Entry<Object,Object> property : properties.entrySet()) {
+            if (property.getValue() instanceof String) {
+                Matcher matcher = pattern.matcher((String) property.getValue());
+                if (matcher.matches()) {
+                    String value = readFile(new File(getBaseDir(), matcher.group(1)));
+                    properties.put(property.getKey(), value);
+                }
+            }
         }
     }
 

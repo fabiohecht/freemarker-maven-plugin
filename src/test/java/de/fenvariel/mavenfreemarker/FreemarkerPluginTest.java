@@ -34,7 +34,10 @@ public class FreemarkerPluginTest extends FreemarkerPlugin {
         baos.close();
 
         System.out.print(content);
-        Assert.assertTrue(content.length() > 0);
+        Assert.assertTrue(content.contains("<l7:Name>Hello World API v1</l7:Name>"));
+        Assert.assertTrue(content.contains("<l7:UrlPattern>/helloworld/v1</l7:UrlPattern>"));
+        Assert.assertTrue(content.contains("&lt;L7p:Comment stringValue=\"hey, I&apos;m an included property value\"/&gt;"));
+        Assert.assertFalse(content.contains("ZmlsZShpbmNsdWRlZF9wcm9wZXJ0eSk="));
     }
 
     @Test

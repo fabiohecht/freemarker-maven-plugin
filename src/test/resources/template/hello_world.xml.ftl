@@ -18,6 +18,9 @@
                         &lt;L7p:Base64Expression stringValue="${base64Encode(build_included)}"/&gt;
                         &lt;L7p:VariableToSet stringValue="swagger"/&gt;
                     &lt;/L7p:SetVariable&gt;
+                    &lt;L7p:CommentAssertion&gt;
+                        &lt;L7p:Comment stringValue="${build_included}"/&gt;
+                    &lt;/L7p:CommentAssertion&gt;
                     &lt;L7p:HardcodedResponse&gt;
                         &lt;L7p:Base64ResponseBody stringValue=&quot;${dont_replace}&quot;/&gt;
                     &lt;/L7p:HardcodedResponse&gt;
