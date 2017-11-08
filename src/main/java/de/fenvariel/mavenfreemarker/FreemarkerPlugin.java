@@ -177,7 +177,7 @@ public class FreemarkerPlugin extends AbstractMojo {
 
         for (PropertiesFile propertiesFile : propertiesFiles) {
 
-            System.out.println("process PropertiesFile = " + propertiesFile.toString());
+            System.out.println("process PropertiesFile = " + propertiesFile);
 
             Collection<File> sourceFiles;
             try {
