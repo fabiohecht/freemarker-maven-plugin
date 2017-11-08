@@ -14,6 +14,10 @@
             <l7:Resource type="policy">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
                 &lt;wsp:Policy xmlns:L7p=&quot;http://www.layer7tech.com/ws/policy&quot; xmlns:wsp=&quot;http://schemas.xmlsoap.org/ws/2002/12/policy"&gt;
                 &lt;wsp:All wsp:Usage=&quot;Required&quot;&gt;
+                    &lt;L7p:SetVariable&gt;
+                        &lt;L7p:Base64Expression stringValue="${base64Encode(build_included)}"/&gt;
+                        &lt;L7p:VariableToSet stringValue="swagger"/&gt;
+                    &lt;/L7p:SetVariable&gt;
                     &lt;L7p:HardcodedResponse&gt;
                         &lt;L7p:Base64ResponseBody stringValue=&quot;${dont_replace}&quot;/&gt;
                     &lt;/L7p:HardcodedResponse&gt;

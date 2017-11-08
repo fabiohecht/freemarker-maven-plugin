@@ -22,6 +22,11 @@ import freemarker.core.XMLOutputFormat;
 import freemarker.log.Logger;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
+import freemarker.template.TemplateException;
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -34,10 +39,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
 
 @Mojo(name = "process-ftl")
 public class FreemarkerPlugin extends AbstractMojo {
@@ -62,9 +63,40 @@ public class FreemarkerPlugin extends AbstractMojo {
     @Parameter
     private PropertiesFile[] propertiesFiles;
 
+    private OutputStream outputStream;
+
     private Logger log = Logger.getLogger(FreemarkerPlugin.class.getName());
 
     private Configuration fmConfiguration;
+
+    protected static Properties loadProperties(String filename) {
+
+        Properties prop = new Properties();
+        InputStream input = null;
+
+        try {
+            input = Files.newInputStream(Paths.get(filename));//Generator.class.getClassLoader().getResourceAsStream(filename);
+            if (input == null) {
+                throw new RuntimeException("Unable to find configuration file " + filename);
+            }
+
+            //load a properties file from class path, inside static method
+            prop.load(new InputStreamReader(input, Charset.forName("UTF-8")));
+
+            return prop;
+
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to read configuration file " + filename, e);
+        } finally {
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (IOException e) {
+                    throw new RuntimeException("Unable to read configuration file " + filename, e);
+                }
+            }
+        }
+    }
 
     @Override
     public void execute() throws MojoExecutionException {
@@ -139,7 +171,7 @@ public class FreemarkerPlugin extends AbstractMojo {
         }
 
         File outputDir = getOutputDir();
-        if (!outputDir.exists()) {
+        if (outputDir != null && !outputDir.exists()) {
             System.out.println("creating output dir " + outputDir);
             outputDir.mkdirs();
         }
@@ -171,17 +203,21 @@ public class FreemarkerPlugin extends AbstractMojo {
 
         }
 
-        String destinationFilename = getPrefix() + getNameWithoutExtension(getFtlTemplate()) + getSuffix();
-        Path destinationFilePath = Paths.get(outputDir.getAbsolutePath(), destinationFilename + getTargetExtension());
-        File destinationFile = destinationFilePath.toFile();
-
-        Map<String, Object> configMap = getConfig();
-        configMap.put("destinationFilePath", destinationFilePath);
-        configMap.put("destinationFilename", destinationFilename);
-        data.put("config", configMap);
-
         data.put("base64Encode", new Base64Encoder());
-        generate(template, destinationFile, data);
+        if (this.outputStream!=null) {
+            generate(template, new PrintWriter(this.outputStream), data);
+        } else {
+            String destinationFilename = getPrefix() + getNameWithoutExtension(getFtlTemplate()) + getSuffix();
+            Path destinationFilePath = Paths.get(outputDir.getAbsolutePath(), destinationFilename + getTargetExtension());
+            File destinationFile = destinationFilePath.toFile();
+
+            Map<String, Object> configMap = getConfig();
+            configMap.put("destinationFilePath", destinationFilePath);
+            configMap.put("destinationFilename", destinationFilename);
+            data.put("config", configMap);
+
+            generate(template, destinationFile, data);
+        }
     }
 
     private Map<String, Object> readJson(File source) throws MojoExecutionException {
@@ -194,24 +230,39 @@ public class FreemarkerPlugin extends AbstractMojo {
         }
     }
 
-    private void generate(Template template, File file, Properties data) throws MojoExecutionException {
-        try {
+    public void setOutputStream(OutputStream outputStream) {
+        this.outputStream = outputStream;
+    }
 
+    private void generate(Template template, Writer writer, Properties data) throws MojoExecutionException {
+
+        escapePlaceholders(new File(getTemplateDir(), getFtlTemplate()), data);
+
+        System.out.println("using config = " + data.toString());
+        try {
+            template.process(data, writer);
+            writer.flush();
+        } catch (IOException ex) {
+            throw new MojoExecutionException("error writing output stream for template " + template.getName() + " and source " + data, ex);
+        } catch (TemplateException ex) {
+            throw new MojoExecutionException("error processing template " + template.getName() + " and source " + data, ex);
+        } finally {
+            try {
+                writer.close();
+            } catch (IOException ex) {
+                throw new MojoExecutionException("error closing output stream for template " + template.getName() + " and source " + data, ex);
+            }
+        }
+    }
+
+    private void generate(Template template, File file, Properties data) throws MojoExecutionException {
             file.getParentFile().mkdirs();
 
-            escapePlaceholders(file, data);
-
-            Writer writer = new FileWriter(file);
             try {
-                System.out.println("using config = " + data.toString());
-
-                template.process(data, writer);
-                writer.flush();
+            Writer writer = new FileWriter(file);
+            generate(template, writer, data);
                 System.out.println("Written " + file.getCanonicalPath());
-            } finally {
-                writer.close();
-            }
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             throw new MojoExecutionException("error generating file: " + file.getAbsolutePath() + " from template " + template.getName() + " and source " + data, ex);
         }
     }
@@ -219,15 +270,15 @@ public class FreemarkerPlugin extends AbstractMojo {
     /**
      * Escapes placeholders that
      */
-    void escapePlaceholders(File file, Properties properties) throws MojoExecutionException {
+    void escapePlaceholders(File templateFile, Properties properties) throws MojoExecutionException {
 
         String contents;
 
-        if (file.exists()) {
+        if (templateFile.exists()) {
             try {
-                contents = readFile(file);
+                contents = readFile(templateFile);
             } catch (IOException ex) {
-                throw new MojoExecutionException("error parsing file for keep-sections: " + file.getAbsolutePath(), ex);
+                throw new MojoExecutionException("error parsing file for keep-sections: " + templateFile.getAbsolutePath(), ex);
             }
 
             escapePlaceholders(contents, properties);
@@ -235,9 +286,9 @@ public class FreemarkerPlugin extends AbstractMojo {
     }
 
 
-    void escapePlaceholders(String contents, Properties properties) {
+    void escapePlaceholders(String templateContents, Properties properties) {
         Pattern pattern = Pattern.compile("\\$\\{((?!build_|env_)[^\\}]+)\\}");
-        Matcher matcher = pattern.matcher(contents);
+        Matcher matcher = pattern.matcher(templateContents);
 
         while (matcher.find()) {
             String var = matcher.group(1);
@@ -250,37 +301,12 @@ public class FreemarkerPlugin extends AbstractMojo {
         return new String(bytes);
     }
 
-    protected static Properties loadProperties(String filename) {
-
-        Properties prop = new Properties();
-        InputStream input = null;
-
-        try {
-            input = Files.newInputStream(Paths.get(filename));//Generator.class.getClassLoader().getResourceAsStream(filename);
-            if (input == null) {
-                throw new RuntimeException("Unable to find configuration file " + filename);
-            }
-
-            //load a properties file from class path, inside static method
-            prop.load(new InputStreamReader(input, Charset.forName("UTF-8")));
-
-            return prop;
-
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to read configuration file " + filename, e);
-        } finally {
-            if (input != null) {
-                try {
-                    input.close();
-                } catch (IOException e) {
-                    throw new RuntimeException("Unable to read configuration file " + filename, e);
-                }
-            }
-        }
-    }
-
     public String getFtlTemplate() {
         return ftlTemplate;
+    }
+
+    public void setFtlTemplate(String ftlTemplate) {
+        this.ftlTemplate = ftlTemplate;
     }
 
     public Version getVersion() {
@@ -303,6 +329,19 @@ public class FreemarkerPlugin extends AbstractMojo {
         return targetExtension;
     }
 
+    public void setTargetExtension(String targetExtension) {
+        if (targetExtension == null || targetExtension.trim().isEmpty()) {
+            this.targetExtension = "";
+        } else {
+            targetExtension = targetExtension.trim();
+            if (targetExtension.charAt(0) != '.') {
+                targetExtension = "." + targetExtension;
+            }
+            this.targetExtension = targetExtension;
+        }
+
+    }
+
     public String getPrefix() {
         return prefix;
     }
@@ -317,23 +356,6 @@ public class FreemarkerPlugin extends AbstractMojo {
 
     public void setSuffix(String suffix) {
         this.suffix = suffix;
-    }
-
-    public void setTargetExtension(String targetExtension) {
-        if (targetExtension == null || targetExtension.trim().isEmpty()) {
-            this.targetExtension = "";
-        } else {
-            targetExtension = targetExtension.trim();
-            if (targetExtension.charAt(0) != '.') {
-                targetExtension = "." + targetExtension;
-            }
-            this.targetExtension = targetExtension;
-        }
-
-    }
-
-    public void setFtlTemplate(String ftlTemplate) {
-        this.ftlTemplate = ftlTemplate;
     }
 
     private Pattern compilePattern(String sectionName) {
