@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 @Mojo(name = "process-ftl")
 public class FreemarkerPlugin extends AbstractMojo {
 
-    @Parameter(defaultValue = "${basedir}", readonly = true)
+    @Parameter
     private File baseDir;
 
     @Parameter
