@@ -56,11 +56,4 @@ public class FreemarkerPluginTest extends FreemarkerPlugin {
         Assert.assertFalse(properties.containsKey("ghi"));
     }
 
-    @Test
-    public void testInclude() throws Exception {
-        java.util.Properties properties = new java.util.Properties();
-        String text = "abc ${abc} def ${env_dev} ghi ${build_ghi} jkl ${jkl}";
-
-        Assert.assertTrue(properties.containsKey("abc"));
-    }
 }
