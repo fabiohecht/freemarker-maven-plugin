@@ -47,6 +47,10 @@ public class PropertiesFile {
         this.files = files;
     }
 
+    public String getFiles() {
+        return files;
+    }
+
     @Override
     public String toString() {
         return files;

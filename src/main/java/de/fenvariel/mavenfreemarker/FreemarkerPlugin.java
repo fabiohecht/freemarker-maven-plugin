@@ -174,21 +174,22 @@ public class FreemarkerPlugin extends AbstractMojo {
         }
 
         Properties data = new Properties();
+        data.put("base64Encode", new Base64Encoder());
 
         for (PropertiesFile propertiesFile : propertiesFiles) {
 
             System.out.println("process PropertiesFile = " + propertiesFile);
 
-            Collection<File> sourceFiles;
+            Collection<File> propertiesFiles;
             try {
-                sourceFiles = propertiesFile.getPropertiesFiles(baseDir);
+                propertiesFiles = propertiesFile.getPropertiesFiles(baseDir);
             } catch (IOException ex) {
                 throw new MojoExecutionException("error reading source files", ex);
             }
-            if (sourceFiles == null || sourceFiles.isEmpty()) {
-                throw new MojoExecutionException("no source files found for bundle");
+            if (propertiesFiles == null || propertiesFiles.isEmpty()) {
+                throw new MojoExecutionException("no properties files found with matcher " + propertiesFile.getFiles());
             }
-            for (File file : sourceFiles) {
+            for (File file : propertiesFiles) {
                 System.out.println("processing source file = " + file.getName());
 
                 try {
@@ -197,10 +198,8 @@ public class FreemarkerPlugin extends AbstractMojo {
                     throw new MojoExecutionException("PropertiesFile file '" + propertiesFile + "' cannot be loaded: " + e.getMessage(), e);
                 }
             }
-
         }
 
-        data.put("base64Encode", new Base64Encoder());
         if (this.outputStream!=null) {
             generate(template, new PrintWriter(this.outputStream), data);
         } else {
